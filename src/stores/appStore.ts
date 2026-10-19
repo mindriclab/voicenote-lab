@@ -4,7 +4,14 @@ import type { Language } from '@/lib/i18n';
 
 export type EnrichmentMode = 'original' | 'structured' | 'summary' | 'context';
 export type RecordingStatus = 'idle' | 'recording' | 'transcribing' | 'enriching' | 'done' | 'error';
-export type LLMProvider = 'openai' | 'anthropic';
+export type LLMProvider = 'gemini' | 'openai' | 'anthropic';
+
+// Wählbare globale Tastenkürzel (Tauri-Accelerator-Schreibweise). Bewusst ohne Strg+Shift+V,
+// das ist in vielen Programmen "Einfügen ohne Formatierung".
+// Strg+Alt-Kombinationen mit Leertaste sind auf deutschen Tastaturen AltGr und werden teils abgefangen.
+export const HOTKEY_OPTIONS = ['F9', 'F8', 'Ctrl+Shift+Space', 'Ctrl+Alt+R'] as const;
+export type Hotkey = typeof HOTKEY_OPTIONS[number];
+export const DEFAULT_HOTKEY: Hotkey = 'F9';
 
 // Context sub-types for the "Kontext" mode
 export type ContextType = 
@@ -17,15 +24,27 @@ export type ContextType =
   | 'blog_post'         // Blog-Artikel
   | 'report';           // Bericht/Report
 
-export const CONTEXT_TYPE_LABELS: Record<ContextType, string> = {
-  email_formal: 'Förmliche E-Mail',
-  email_casual: 'Lockere E-Mail',
-  newsletter: 'Newsletter',
-  social_media: 'Social Media Post',
-  meeting_notes: 'Meeting-Notizen',
-  todo_list: 'TODO-Liste',
-  blog_post: 'Blog-Artikel',
-  report: 'Bericht / Report',
+export const CONTEXT_TYPE_LABELS: Record<Language, Record<ContextType, string>> = {
+  de: {
+    email_formal: 'Förmliche E-Mail',
+    email_casual: 'Lockere E-Mail',
+    newsletter: 'Newsletter',
+    social_media: 'Social Media Post',
+    meeting_notes: 'Meeting-Notizen',
+    todo_list: 'TODO-Liste',
+    blog_post: 'Blog-Artikel',
+    report: 'Bericht / Report',
+  },
+  en: {
+    email_formal: 'Formal email',
+    email_casual: 'Casual email',
+    newsletter: 'Newsletter',
+    social_media: 'Social media post',
+    meeting_notes: 'Meeting notes',
+    todo_list: 'To-do list',
+    blog_post: 'Blog post',
+    report: 'Report',
+  },
 };
 
 interface HistoryEntry {
@@ -56,9 +75,11 @@ interface AppState {
   selectedContextType: ContextType;
   
   // Settings
+  geminiApiKey: string;
   openaiApiKey: string;
   anthropicApiKey: string;
   selectedLLM: LLMProvider;
+  hotkey: Hotkey;
   selectedMicrophone: string;
   availableMicrophones: AudioDevice[];
   language: Language;
@@ -81,7 +102,9 @@ interface AppState {
   setErrorMessage: (message: string) => void;
   setSelectedMode: (mode: EnrichmentMode) => void;
   setSelectedContextType: (type: ContextType) => void;
+  setGeminiApiKey: (key: string) => void;
   setOpenaiApiKey: (key: string) => void;
+  setHotkey: (hotkey: Hotkey) => void;
   setAnthropicApiKey: (key: string) => void;
   setSelectedLLM: (provider: LLMProvider) => void;
   setSelectedMicrophone: (deviceId: string) => void;
@@ -107,9 +130,11 @@ export const useAppStore = create<AppState>()(
       errorMessage: '',
       selectedMode: 'structured',
       selectedContextType: 'email_formal',
+      geminiApiKey: '',
       openaiApiKey: '',
       anthropicApiKey: '',
-      selectedLLM: 'openai',
+      selectedLLM: 'gemini',
+      hotkey: DEFAULT_HOTKEY,
       selectedMicrophone: '',
       availableMicrophones: [],
       language: 'de',
@@ -130,7 +155,9 @@ export const useAppStore = create<AppState>()(
       setErrorMessage: (errorMessage) => set({ errorMessage }),
       setSelectedMode: (selectedMode) => set({ selectedMode }),
       setSelectedContextType: (selectedContextType) => set({ selectedContextType }),
+      setGeminiApiKey: (geminiApiKey) => set({ geminiApiKey }),
       setOpenaiApiKey: (openaiApiKey) => set({ openaiApiKey }),
+      setHotkey: (hotkey) => set({ hotkey }),
       setAnthropicApiKey: (anthropicApiKey) => set({ anthropicApiKey }),
       setSelectedLLM: (selectedLLM) => set({ selectedLLM }),
       setSelectedMicrophone: (selectedMicrophone) => set({ selectedMicrophone }),
@@ -169,9 +196,11 @@ export const useAppStore = create<AppState>()(
       }),
     }),
     {
-      name: 'voiceintel-storage',
+      name: 'voicenote-lab-storage',
       partialize: (state) => ({
+        geminiApiKey: state.geminiApiKey,
         openaiApiKey: state.openaiApiKey,
+        hotkey: state.hotkey,
         anthropicApiKey: state.anthropicApiKey,
         selectedLLM: state.selectedLLM,
         selectedMode: state.selectedMode,

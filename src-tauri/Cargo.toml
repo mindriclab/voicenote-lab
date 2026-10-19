@@ -1,8 +1,8 @@
 [package]
-name = "voice-intel"
-version = "0.1.0"
-description = "Voice Intelligence App - Voice-to-Text mit KI-Enrichment"
-authors = ["VoiceIntel"]
+name = "voicenote-lab"
+version = "0.2.0"
+description = "VoiceNote Lab - Sprachnotizen mit KI-Aufbereitung"
+authors = ["Rico Herrmann (mindric lab)"]
 edition = "2021"
 
 [build-dependencies]

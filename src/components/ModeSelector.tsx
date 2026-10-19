@@ -2,13 +2,9 @@
 
 import { ChevronDown } from 'lucide-react';
 import { useAppStore, EnrichmentMode, ContextType, CONTEXT_TYPE_LABELS } from '@/stores/appStore';
+import { t } from '@/lib/i18n';
 
-const modes: { id: EnrichmentMode; label: string }[] = [
-  { id: 'original', label: 'Original' },
-  { id: 'structured', label: 'Strukturiert' },
-  { id: 'summary', label: 'Zusammenfassung' },
-  { id: 'context', label: 'Kontext' },
-];
+const modes: EnrichmentMode[] = ['original', 'structured', 'summary', 'context'];
 
 interface ModeSelectorProps {
   onModeChange?: (mode: EnrichmentMode, contextType?: ContextType) => void;
@@ -21,7 +17,8 @@ export function ModeSelector({ onModeChange }: ModeSelectorProps) {
     selectedContextType, 
     setSelectedContextType,
     currentTranscript,
-    isReprocessing
+    isReprocessing,
+    language
   } = useAppStore();
   
   const handleModeChange = (mode: EnrichmentMode) => {
@@ -45,7 +42,8 @@ export function ModeSelector({ onModeChange }: ModeSelectorProps) {
       
       {/* 4 Buttons horizontal */}
       <div style={{ display: 'flex', gap: '12px' }}>
-        {modes.map((mode) => {
+        {modes.map((modeId) => {
+          const mode = { id: modeId, label: t(modeId, language) };
           const isActive = selectedMode === mode.id;
           
           return (
@@ -83,7 +81,7 @@ export function ModeSelector({ onModeChange }: ModeSelectorProps) {
               cursor: 'pointer'
             }}
           >
-            {Object.entries(CONTEXT_TYPE_LABELS).map(([value, label]) => (
+            {Object.entries(CONTEXT_TYPE_LABELS[language]).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>

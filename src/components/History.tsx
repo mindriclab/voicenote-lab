@@ -2,11 +2,12 @@
 
 import { X, Copy, Trash2, Clock, ChevronDown, ChevronUp, Check, FileText } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
+import { t } from '@/lib/i18n';
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 export function History() {
-  const { showHistory, toggleHistory, history, clearHistory } = useAppStore();
+  const { showHistory, toggleHistory, history, clearHistory, language } = useAppStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   
@@ -21,7 +22,7 @@ export function History() {
   };
   
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('de-DE', {
+    return new Date(timestamp).toLocaleString(language === 'de' ? 'de-DE' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: '2-digit',
@@ -30,15 +31,10 @@ export function History() {
     });
   };
   
-  const getModeLabel = (mode: string) => {
-    const labels: Record<string, string> = {
-      original: 'Original',
-      structured: 'Strukturiert',
-      summary: 'Zusammenfassung',
-      context: 'Kontext',
-    };
-    return labels[mode] || mode;
-  };
+  const getModeLabel = (mode: string) =>
+    ['original', 'structured', 'summary', 'context'].includes(mode)
+      ? t(mode as 'original' | 'structured' | 'summary' | 'context', language)
+      : mode;
   
   const getModeColor = (mode: string) => {
     const colors: Record<string, string> = {
@@ -103,7 +99,7 @@ export function History() {
                 padding: '2px 8px', 
                 borderRadius: '10px' 
               }}>
-                {history.length} {history.length === 1 ? 'Eintrag' : 'Einträge'}
+                {history.length} {history.length === 1 ? t('entry', language) : t('entries', language)}
               </span>
             )}
           </div>
@@ -111,7 +107,7 @@ export function History() {
             {history.length > 0 && (
               <button
                 onClick={() => {
-                  if (confirm('Möchtest du den gesamten Verlauf löschen?')) {
+                  if (confirm(t('confirmClearHistory', language))) {
                     clearHistory();
                   }
                 }}
@@ -131,7 +127,7 @@ export function History() {
                 onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 <Trash2 size={14} />
-                Alle löschen
+                {t('clearAll', language)}
               </button>
             )}
             <button 
@@ -181,7 +177,7 @@ export function History() {
                 <FileText size={28} style={{ color: '#555' }} />
               </div>
               <p style={{ fontSize: '15px', color: '#888', marginBottom: '8px' }}>
-                Noch keine Einträge
+                {t('noHistory', language)}
               </p>
               <p style={{ fontSize: '13px', color: '#555' }}>
                 Deine gespeicherten Aufnahmen erscheinen hier
@@ -298,7 +294,7 @@ export function History() {
                             }}
                           >
                             {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                            {isCopied ? 'Kopiert!' : 'Kopieren'}
+                            {isCopied ? t('copied', language) : t('copy', language)}
                           </button>
                         </div>
                       </div>
@@ -333,7 +329,7 @@ export function History() {
             onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#ea580c'}
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f97316'}
           >
-            Schließen
+            {t('close', language)}
           </button>
         </div>
       </div>

@@ -4,6 +4,8 @@ import { X, FileText, FileCode, File, Download } from 'lucide-react';
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { invoke } from '@tauri-apps/api/core';
+import { useAppStore } from '@/stores/appStore';
+import { t, TranslationKey } from '@/lib/i18n';
 
 type FileFormat = 'txt' | 'md' | 'pdf' | 'json';
 
@@ -15,23 +17,25 @@ interface SaveDialogProps {
   mode: string;
 }
 
-const FORMAT_OPTIONS: { id: FileFormat; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'txt', label: 'Text (.txt)', icon: <FileText size={20} />, description: 'Einfache Textdatei' },
-  { id: 'md', label: 'Markdown (.md)', icon: <FileCode size={20} />, description: 'Formatierter Text für Notion, Obsidian, etc.' },
-  { id: 'pdf', label: 'PDF (.pdf)', icon: <File size={20} />, description: 'Druckfertiges Dokument' },
-  { id: 'json', label: 'JSON (.json)', icon: <FileCode size={20} />, description: 'Strukturierte Daten' },
+const FORMAT_OPTIONS: { id: FileFormat; label: string; icon: React.ReactNode; description: TranslationKey }[] = [
+  { id: 'txt', label: 'Text (.txt)', icon: <FileText size={20} />, description: 'fmtTxt' },
+  { id: 'md', label: 'Markdown (.md)', icon: <FileCode size={20} />, description: 'fmtMd' },
+  { id: 'pdf', label: 'PDF (.pdf)', icon: <File size={20} />, description: 'fmtPdf' },
+  { id: 'json', label: 'JSON (.json)', icon: <FileCode size={20} />, description: 'fmtJson' },
 ];
 
 export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: SaveDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<FileFormat>('txt');
-  const [fileName, setFileName] = useState('voiceintel-export');
+  const language = useAppStore((s) => s.language);
+  const locale = language === 'de' ? 'de-DE' : 'en-US';
+  const [fileName, setFileName] = useState('voicenote-export');
   const [includeTranscript, setIncludeTranscript] = useState(true);
   const [includeEnriched, setIncludeEnriched] = useState(true);
 
   if (!isOpen) return null;
 
   const generateContent = () => {
-    const timestamp = new Date().toLocaleString('de-DE');
+    const timestamp = new Date().toLocaleString(locale);
     let content = '';
     
     // Bestimme das Label für die angereicherte Ausgabe basierend auf dem Modus
@@ -47,27 +51,27 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
     }
 
     if (selectedFormat === 'md') {
-      content += `# VoiceIntel Export\n\n`;
-      content += `**Datum:** ${timestamp}\n`;
-      content += `**Modus:** ${mode}\n\n`;
+      content += `# VoiceNote Lab Export\n\n`;
+      content += `**${t('date', language)}:** ${timestamp}\n`;
+      content += `**${t('modeLabel', language)}:** ${mode}\n\n`;
       content += `---\n\n`;
       
       if (includeTranscript && transcript) {
-        content += `## Transkript\n\n${transcript}\n\n`;
+        content += `## ${t('transcriptLabel', language)}\n\n${transcript}\n\n`;
       }
       if (includeEnriched && enrichedText) {
         content += `## ${enrichedLabel}\n\n${enrichedText}\n`;
       }
     } else {
       // TXT format
-      content += `VoiceIntel Export\n`;
+      content += `VoiceNote Lab Export\n`;
       content += `==================\n\n`;
-      content += `Datum: ${timestamp}\n`;
-      content += `Modus: ${mode}\n\n`;
+      content += `${t('date', language)}: ${timestamp}\n`;
+      content += `${t('modeLabel', language)}: ${mode}\n\n`;
       content += `---\n\n`;
       
       if (includeTranscript && transcript) {
-        content += `TRANSKRIPT:\n\n${transcript}\n\n`;
+        content += `${t('transcriptLabel', language).toUpperCase()}:\n\n${transcript}\n\n`;
       }
       if (includeEnriched && enrichedText) {
         content += `${enrichedLabel.toUpperCase()}:\n\n${enrichedText}\n`;
@@ -92,14 +96,14 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
         // Title
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
-        doc.text('VoiceIntel Export', margin, 25);
+        doc.text('VoiceNote Lab Export', margin, 25);
         
         // Metadata
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100);
-        doc.text(`Datum: ${new Date().toLocaleString('de-DE')}`, margin, 35);
-        doc.text(`Modus: ${mode}`, margin, 42);
+        doc.text(`${t('date', language)}: ${new Date().toLocaleString(locale)}`, margin, 35);
+        doc.text(`${t('modeLabel', language)}: ${mode}`, margin, 42);
         
         let yPosition = 55;
         doc.setTextColor(0);
@@ -108,7 +112,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
         if (includeTranscript && transcript) {
           doc.setFontSize(14);
           doc.setFont('helvetica', 'bold');
-          doc.text('Transkript', margin, yPosition);
+          doc.text(t('transcriptLabel', language), margin, yPosition);
           yPosition += 8;
           
           doc.setFontSize(11);
@@ -217,7 +221,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
         }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Download size={20} style={{ color: '#f97316' }} />
-            Exportieren
+            {t('exportTitle', language)}
           </h2>
           <button 
             onClick={onClose}
@@ -243,7 +247,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
           {/* Filename */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ fontSize: '13px', color: '#888', fontWeight: 500, display: 'block', marginBottom: '8px' }}>
-              Dateiname
+              {t('fileName', language)}
             </label>
             <input
               type="text"
@@ -268,7 +272,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
           {/* Format Selection */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{ fontSize: '13px', color: '#888', fontWeight: 500, display: 'block', marginBottom: '12px' }}>
-              Format wählen
+              {t('chooseFormat', language)}
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               {FORMAT_OPTIONS.map((format) => (
@@ -295,7 +299,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
                       {format.label}
                     </div>
                     <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                      {format.description}
+                      {t(format.description, language)}
                     </div>
                   </div>
                 </button>
@@ -306,7 +310,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
           {/* Include Options */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ fontSize: '13px', color: '#888', fontWeight: 500, display: 'block', marginBottom: '12px' }}>
-              Inhalt
+              {t('content', language)}
             </label>
             
             <label style={{ 
@@ -331,8 +335,8 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
                 }}
               />
               <div>
-                <div style={{ fontSize: '13px', color: '#fff' }}>Transkript</div>
-                <div style={{ fontSize: '11px', color: '#666' }}>Original-Sprachaufnahme als Text</div>
+                <div style={{ fontSize: '13px', color: '#fff' }}>{t('transcriptLabel', language)}</div>
+                <div style={{ fontSize: '11px', color: '#666' }}>{t('transcriptDesc', language)}</div>
               </div>
             </label>
             
@@ -357,8 +361,8 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
                 }}
               />
               <div>
-                <div style={{ fontSize: '13px', color: '#fff' }}>Angereicherte Ausgabe</div>
-                <div style={{ fontSize: '11px', color: '#666' }}>KI-verarbeiteter Text</div>
+                <div style={{ fontSize: '13px', color: '#fff' }}>{t('enrichedLabel', language)}</div>
+                <div style={{ fontSize: '11px', color: '#666' }}>{t('enrichedDesc', language)}</div>
               </div>
             </label>
           </div>
@@ -388,7 +392,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
             onMouseOver={(e) => { e.currentTarget.style.borderColor = '#555'; e.currentTarget.style.color = '#fff'; }}
             onMouseOut={(e) => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#888'; }}
           >
-            Abbrechen
+            {t('cancel', language)}
           </button>
           <button
             onClick={handleSave}
@@ -413,7 +417,7 @@ export function SaveDialog({ isOpen, onClose, transcript, enrichedText, mode }: 
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#f97316'}
           >
             <Download size={16} />
-            Speichern
+            {t('save', language)}
           </button>
         </div>
       </div>

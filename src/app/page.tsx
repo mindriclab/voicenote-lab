@@ -52,9 +52,10 @@ import { SaveDialog } from '@/components/SaveDialog';
 import { AudioWaveform } from '@/components/AudioWaveform';
 import { TextStats } from '@/components/TextStats';
 import { LoadingIndicator } from '@/components/LoadingIndicator';
-import { useAppStore, EnrichmentMode, ContextType } from '@/stores/appStore';
+import { useAppStore, EnrichmentMode, ContextType, HOTKEY_OPTIONS, DEFAULT_HOTKEY } from '@/stores/appStore';
 import { audioRecorder } from '@/lib/audioRecorder';
-import { transcribeAudio, enrichText } from '@/lib/api';
+import { transcribeAudio, enrichText, isReady, ApiKeys } from '@/lib/api';
+import { registerHotkey, formatHotkey } from '@/lib/hotkey';
 import { playStartSound, playStopSound, playSuccessSound } from '@/lib/sounds';
 import { t } from '@/lib/i18n';
 
@@ -71,15 +72,7 @@ function ResultButtons() {
     }
   };
   
-  const getModeLabel = () => {
-    const labels: Record<string, string> = {
-      original: 'Original',
-      structured: 'Strukturiert',
-      summary: 'Zusammenfassung',
-      context: 'Kontext',
-    };
-    return labels[selectedMode] || selectedMode;
-  };
+  const getModeLabel = () => t(selectedMode, language);
   
   return (
     <>
@@ -149,9 +142,13 @@ export default function Home() {
     errorMessage,
     selectedMode,
     selectedContextType,
+    geminiApiKey,
     openaiApiKey,
     anthropicApiKey,
     selectedLLM,
+    setSelectedLLM,
+    hotkey,
+    setHotkey,
     selectedMicrophone,
     setAvailableMicrophones,
     setIsReprocessing,
@@ -166,13 +163,31 @@ export default function Home() {
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   
+  const keys: ApiKeys = { gemini: geminiApiKey, openai: openaiApiKey, anthropic: anthropicApiKey };
+  const ready = isReady(selectedLLM, keys);
+
   // Refs to always have current values in event listeners
   const statusRef = useRef(status);
-  const openaiApiKeyRef = useRef(openaiApiKey);
-  
+
   // Keep refs in sync
   useEffect(() => { statusRef.current = status; }, [status]);
-  useEffect(() => { openaiApiKeyRef.current = openaiApiKey; }, [openaiApiKey]);
+
+  // Gewählter Anbieter ohne Schlüssel: auf einen Anbieter mit Schlüssel wechseln
+  useEffect(() => {
+    if (keys[selectedLLM]) return;
+    const withKey = (['gemini', 'openai', 'anthropic'] as const).find((p) => keys[p]);
+    if (withKey) setSelectedLLM(withKey);
+  }, [geminiApiKey, openaiApiKey, anthropicApiKey, selectedLLM, setSelectedLLM]);
+
+  // Globales Tastenkürzel registrieren (und neu, sobald es in den Einstellungen geändert wird)
+  // Ein gespeichertes Kürzel, das es nicht mehr gibt (z. B. Strg+Alt+Leertaste aus 0.2.0), wird auf F9 gesetzt
+  useEffect(() => {
+    if (!HOTKEY_OPTIONS.includes(hotkey)) {
+      setHotkey(DEFAULT_HOTKEY);
+      return;
+    }
+    registerHotkey(hotkey).catch(() => setErrorMessage(t('hotkeyError', language)));
+  }, [hotkey]);
   
   useEffect(() => {
     const loadMics = async () => {
@@ -200,7 +215,7 @@ export default function Home() {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'de-DE';
+    recognition.lang = language === 'de' ? 'de-DE' : 'en-US';
     
     recognition.onresult = (event) => {
       let transcript = '';
@@ -212,7 +227,7 @@ export default function Home() {
     
     recognition.start();
     recognitionRef.current = recognition;
-  }, [setLiveTranscript]);
+  }, [setLiveTranscript, language]);
   
   const stopLiveTranscription = useCallback(() => {
     if (recognitionRef.current) {
@@ -233,18 +248,18 @@ export default function Home() {
     setErrorMessage('');
     
     try {
-      const enrichedText = await enrichText(currentTranscript, mode, selectedLLM, openaiApiKey, anthropicApiKey, contextType);
+      const enrichedText = await enrichText(currentTranscript, mode, selectedLLM, keys, contextType);
       setEnrichedOutput(enrichedText);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Verarbeitung fehlgeschlagen');
+      setErrorMessage(error instanceof Error ? error.message : t('processingFailed', language));
     } finally {
       setIsReprocessing(false);
     }
-  }, [currentTranscript, isReprocessing, selectedLLM, openaiApiKey, anthropicApiKey, setEnrichedOutput, setErrorMessage, setIsReprocessing]);
+  }, [currentTranscript, isReprocessing, selectedLLM, geminiApiKey, openaiApiKey, anthropicApiKey, language, setEnrichedOutput, setErrorMessage, setIsReprocessing]);
   
   const startRecording = useCallback(async () => {
-    if (!openaiApiKey) {
-      setErrorMessage('Bitte OpenAI API Key in den Einstellungen konfigurieren.');
+    if (!ready) {
+      setErrorMessage(t('configureApiKey', language));
       toggleSettings();
       return;
     }
@@ -254,7 +269,9 @@ export default function Home() {
       setCurrentTranscript('');
       setEnrichedOutput('');
       setErrorMessage('');
-      
+      // Zeit der vorigen Aufnahme nicht kurz aufblitzen lassen
+      setRecordingTime(0);
+
       await audioRecorder.start();
       setMediaStream(audioRecorder.getStream());
       startLiveTranscription();
@@ -267,10 +284,10 @@ export default function Home() {
         setRecordingTime(elapsed);
       }, 1000);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Aufnahme fehlgeschlagen');
+      setErrorMessage(error instanceof Error ? error.message : t('recordingFailed', language));
       setStatus('error');
     }
-  }, [openaiApiKey, setStatus, setRecordingTime, setErrorMessage, setLiveTranscript, setCurrentTranscript, setEnrichedOutput, toggleSettings, startLiveTranscription]);
+  }, [ready, language, setStatus, setRecordingTime, setErrorMessage, setLiveTranscript, setCurrentTranscript, setEnrichedOutput, toggleSettings, startLiveTranscription]);
   
   const stopRecording = useCallback(async () => {
     if (timerRef.current) {
@@ -286,17 +303,17 @@ export default function Home() {
       const audioBlob = await audioRecorder.stop();
       
       if (audioBlob.size < 1000) {
-        setErrorMessage('Aufnahme zu kurz.');
+        setErrorMessage(t('recordingTooShort', language));
         setStatus('idle');
         return;
       }
       
-      const transcript = await transcribeAudio(audioBlob, openaiApiKey);
+      const transcript = await transcribeAudio(audioBlob, selectedLLM, keys, language);
       setCurrentTranscript(transcript);
       setLiveTranscript('');
       
       if (!transcript.trim()) {
-        setErrorMessage('Keine Sprache erkannt.');
+        setErrorMessage(t('noSpeechDetected', language));
         setStatus('idle');
         return;
       }
@@ -309,24 +326,22 @@ export default function Home() {
       }
       
       setStatus('enriching');
-      const enrichedText = await enrichText(transcript, selectedMode, selectedLLM, openaiApiKey, anthropicApiKey, selectedMode === 'context' ? selectedContextType : undefined);
+      const enrichedText = await enrichText(transcript, selectedMode, selectedLLM, keys, selectedMode === 'context' ? selectedContextType : undefined);
       setEnrichedOutput(enrichedText);
       setStatus('done');
       playSuccessSound();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Fehler');
+      setErrorMessage(error instanceof Error ? error.message : t('error', language));
       setStatus('error');
     }
-  }, [openaiApiKey, anthropicApiKey, selectedMode, selectedContextType, selectedLLM, setStatus, setCurrentTranscript, setEnrichedOutput, setErrorMessage, setLiveTranscript, stopLiveTranscription]);
+  }, [geminiApiKey, openaiApiKey, anthropicApiKey, language, selectedMode, selectedContextType, selectedLLM, setStatus, setCurrentTranscript, setEnrichedOutput, setErrorMessage, setLiveTranscript, stopLiveTranscription]);
   
   const toggleRecording = useCallback(() => {
     if (status === 'recording') stopRecording();
     else if (['idle', 'done', 'error'].includes(status)) startRecording();
   }, [status, startRecording, stopRecording]);
   
-  // Listen for global shortcut event from Tauri backend (Ctrl+Shift+V)
-  const lastShortcutTime = useRef<number>(0);
-  
+  // Listen for global shortcut event from Tauri backend (feuert nur beim Drücken, nicht beim Loslassen)
   // Store functions in refs to avoid stale closures
   const startRecordingRef = useRef(startRecording);
   const stopRecordingRef = useRef(stopRecording);
@@ -339,14 +354,6 @@ export default function Home() {
     const setupListener = async () => {
       try {
         unlisten = await listen('start-recording', () => {
-          // Debounce: ignore if less than 500ms since last trigger
-          const now = Date.now();
-          if (now - lastShortcutTime.current < 500) {
-            console.log('Shortcut debounced');
-            return;
-          }
-          lastShortcutTime.current = now;
-          
           // Use refs to get current values
           const currentStatus = statusRef.current;
           
@@ -386,9 +393,9 @@ export default function Home() {
             className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-black"
             style={{ background: '#f97316' }}
           >
-            VI
+            VN
           </div>
-          <span className="font-semibold text-white">VoiceIntel</span>
+          <span className="font-semibold text-white">VoiceNote Lab</span>
         </div>
         
         {/* Right: Navigation */}
@@ -466,7 +473,7 @@ export default function Home() {
             ) : (
               <div>
                 <p className="text-sm text-zinc-400">{t('clickToRecord', language)}</p>
-                <p className="text-xs text-zinc-600">{t('orShortcut', language)}</p>
+                <p className="text-xs text-zinc-600">{t('or', language)} {formatHotkey(hotkey, language)}</p>
               </div>
             )}
             
@@ -584,20 +591,20 @@ export default function Home() {
           <span 
             className="w-2 h-2 rounded-full"
             style={{ 
-              backgroundColor: openaiApiKey ? '#22c55e' : '#ef4444',
-              boxShadow: openaiApiKey 
-                ? '0 0 8px rgba(34, 197, 94, 0.6)' 
+              backgroundColor: ready ? '#22c55e' : '#ef4444',
+              boxShadow: ready
+                ? '0 0 8px rgba(34, 197, 94, 0.6)'
                 : '0 0 8px rgba(239, 68, 68, 0.6)',
             }}
           />
-          <span style={{ color: openaiApiKey ? '#22c55e' : '#ef4444' }}>
-            {openaiApiKey ? t('ready', language) : t('apiKeyMissing', language)}
+          <span style={{ color: ready ? '#22c55e' : '#ef4444' }}>
+            {ready ? t('ready', language) : t('apiKeyMissing', language)}
           </span>
         </div>
         
         {/* Mitte: Shortcut */}
         <div className="text-center" style={{ color: '#444' }}>
-          Ctrl+Shift+V
+          {formatHotkey(hotkey, language)}
         </div>
         
         {/* Rechts: Credit */}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VoiceIntel - Voice Intelligence App",
+  title: "VoiceNote Lab",
   description: "Voice-to-Text mit KI-Enrichment für Desktop",
 };
 

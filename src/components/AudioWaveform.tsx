@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useAppStore } from '@/stores/appStore';
+import { t } from '@/lib/i18n';
 
 interface AudioWaveformProps {
   isRecording: boolean;
@@ -8,6 +10,7 @@ interface AudioWaveformProps {
 }
 
 export function AudioWaveform({ isRecording, stream }: AudioWaveformProps) {
+  const language = useAppStore((s) => s.language);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -121,7 +124,7 @@ export function AudioWaveform({ isRecording, stream }: AudioWaveformProps) {
           background: 'rgba(255, 255, 255, 0.03)',
         }}
       />
-      <span className="text-xs text-zinc-500">Aufnahme läuft...</span>
+      <span className="text-xs text-zinc-500">{t('recording', language)}</span>
     </div>
   );
 }

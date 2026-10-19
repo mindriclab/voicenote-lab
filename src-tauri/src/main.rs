@@ -7,7 +7,32 @@ use std::fs;
 // Tauri command to get recording status
 #[tauri::command]
 fn get_app_info() -> String {
-    "VoiceIntel v0.1.0".to_string()
+    "VoiceNote Lab v0.2.0".to_string()
+}
+
+// Globales Tastenkürzel setzen (wählbar in den Einstellungen).
+// Reagiert nur beim Drücken, nicht beim Loslassen, und holt das Fenster nach vorn.
+#[tauri::command]
+fn set_shortcut(app: tauri::AppHandle, accelerator: String) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+    let shortcut: Shortcut = accelerator.parse().map_err(|e| format!("{e}"))?;
+    let global = app.global_shortcut();
+    global.unregister_all().map_err(|e| e.to_string())?;
+
+    let app_handle = app.clone();
+    global
+        .on_shortcut(shortcut, move |_app, _shortcut, event| {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            if let Some(window) = app_handle.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.emit("start-recording", ());
+            }
+        })
+        .map_err(|e| e.to_string())
 }
 
 // Command to save file with dialog
@@ -121,28 +146,9 @@ fn main() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .setup(|app| {
-            // Register global shortcut (Ctrl+Shift+V)
-            #[cfg(desktop)]
-            {
-                use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
-                
-                let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyV);
-                let app_handle = app.handle().clone();
-                
-                app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, _event| {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        let _ = window.emit("start-recording", ());
-                    }
-                })?;
-            }
-
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![
             get_app_info,
+            set_shortcut,
             trigger_recording,
             copy_to_clipboard,
             enter_compact_mode,

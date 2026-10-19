@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "VoiceIntel",
-  "version": "0.1.0",
-  "identifier": "com.voiceintel.app",
+  "productName": "VoiceNote Lab",
+  "version": "0.2.0",
+  "identifier": "de.mindriclab.voicenotelab",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:3000",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "VoiceIntel",
+        "title": "VoiceNote Lab",
         "label": "main",
         "width": 600,
         "height": 500,
@@ -31,6 +31,7 @@
     "trayIcon": null
   },
   "bundle": {
+    "publisher": "mindric lab",
     "active": true,
     "targets": "all",
     "icon": [
@@ -43,7 +44,7 @@
   },
   "plugins": {
     "sql": {
-      "preload": ["sqlite:voiceintel.db"]
+      "preload": ["sqlite:voicenote-lab.db"]
     }
   }
 }
