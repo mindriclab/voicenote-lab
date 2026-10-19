@@ -33,8 +33,8 @@ Die Schlüssel bleiben lokal auf dem PC und gehen nur an den jeweiligen Anbieter
 Voraussetzungen: Node.js 20+, Rust ([rustup.rs](https://rustup.rs)), unter Windows die Visual-Studio-Build-Tools.
 
 ```bash
-git clone https://github.com/mindriclab/voice-intel.git
-cd voice-intel
+git clone https://github.com/mindriclab/voicenote-lab.git
+cd voicenote-lab
 npm install
 npm run tauri dev      # Entwicklung
 npm run tauri build    # Installer unter src-tauri/target/release/bundle/
